@@ -9,17 +9,18 @@
 class AlgoPlaylistKonbini
 {
     protected $jwp_API;
-    protected $playlistTag = 'algo test bot';
-    protected $channelKey = 'JKltxRtB';
-    protected $daysInterval = 7;
-    protected $videosNb = 10;
+    protected $playlistTag;
+    protected $channelKey;
+    protected $daysInterval;
+    protected $videosNb;
 
     /**
      * @param string $playlistTag
      */
     public function setPlaylistTag($playlistTag)
     {
-        $this->playlistTag = $playlistTag;
+        $this->playlistTag = trim($playlistTag);
+        $this->jwp_API->call("channels/update", array("channel_key" => $this->channelKey, "tags" => $this->playlistTag));
     }
 
     /**
@@ -65,15 +66,15 @@ class AlgoPlaylistKonbini
         foreach ($currentPlaylistVideos as $v) {
             $this->deleteTag($v["key"], $v["tags"]);
         }
-        echo "Current";
-        print_r($currentPlaylistVideos);
+//        echo "Current";
+//        print_r($currentPlaylistVideos);
 
         // add new videos to playlist
         foreach ($videoSelection as $v) {
             $this->addTagToVideo($v["key"], $v["tags"]);
         }
-        echo "AFTER";
-        print_r($videoSelection);
+//        echo "AFTER";
+//        print_r($videoSelection);
     }
 
     // return playlist from JWPlatform API, json
@@ -92,7 +93,7 @@ class AlgoPlaylistKonbini
 
     protected function addTagToVideo ($videoKey, $oldTag) {
         if (strpos($this->playlistTag, $oldTag)) {
-            echo "tag is already present - ";
+            trigger_error("Tag already present.");
             return ;
         }
         $this->jwp_API->call("/videos/update", array(
@@ -101,8 +102,9 @@ class AlgoPlaylistKonbini
     }
 
     protected function deleteTag ($videoKey, $oldTag) {
-        // if oldTag contain the tag, abort
+        // if oldTag doesn't contain the tag, abort
         if (strpos($this->playlistTag, $oldTag)) {
+            trigger_error("There is no tag to delete ");
             return ;
         }
 
@@ -134,6 +136,7 @@ class AlgoPlaylistKonbini
         $remaining = $this->videosNb;
         $videos = [];
 
+        // at least 2 F&C in the playlist
         $fast = $this->findSpecificVideo("fast", 150);
         for ($i = 0; $i < 2; $i++){
             array_push($videos, $fast["videos"][rand(0, $fast["total"])]);
@@ -149,7 +152,6 @@ class AlgoPlaylistKonbini
                 "start_date" => $this->getStartDate(),
                 "statuses_filter" => "ready",
                 "result_limit" => $remaining));
-
         $videos = array_merge($videos, $recentsVideos["videos"]);
 
         // if recentsVideos are not enought to fill the playlist, grap random fast & curious videos.
@@ -157,7 +159,6 @@ class AlgoPlaylistKonbini
             $remaining = $this->videosNb - count($videos);
             for ($i = 0; $i < $remaining; $i++){
                 array_push($videos, $fast["videos"][rand(0, $fast["total"])]);
-                $remaining--;
             }
         }
 
