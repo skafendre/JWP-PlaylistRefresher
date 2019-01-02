@@ -14,48 +14,94 @@ class AlgoPlaylistKonbini
     protected $daysInterval = 7;
     protected $videosNb = 10;
 
-    function __construct($key, $secret)
+    /**
+     * @param string $playlistTag
+     */
+    public function setPlaylistTag($playlistTag)
+    {
+        $this->playlistTag = $playlistTag;
+    }
+
+    /**
+     * @param string $channelKey
+     */
+    public function setChannelKey($channelKey)
+    {
+        $this->channelKey = $channelKey;
+    }
+
+    /**
+     * @param int $daysInterval
+     */
+    public function setDaysInterval($daysInterval)
+    {
+        $this->daysInterval = $daysInterval;
+    }
+
+    /**
+     * @param int $videosNb
+     */
+    public function setVideosNb($videosNb)
+    {
+        $this->videosNb = $videosNb;
+    }
+
+
+    function __construct($key, $secret, $videosNb, $daysInterval, $playlistTag, $channelKey)
     {
         $this->jwp_API = new JWPAPI($key, $secret);
+        $this->setChannelKey($channelKey);
+        $this->setVideosNb($videosNb);
+        $this->setPlaylistTag($playlistTag);
+        $this->setDaysInterval($daysInterval);
     }
 
     // --> Methods -->
-    function mainLogic () {
+    public function mainLogic () {
+        $videoSelection = $this->selectVideos();
+        $currentPlaylistVideos = $this->getPlaylist()["videos"];
 
-        $videosToAdd = $this->selectVideos();
+        // retire previous videos from playlist
+        foreach ($currentPlaylistVideos as $v) {
+            $this->deleteTag($v["key"], $v["tags"]);
+        }
+        echo "Current";
+        print_r($currentPlaylistVideos);
 
-        // make choosing video to add
-
-        // refresh videos.
-//        foreach ($videosToAdd as $v) {
-//            $this->addTagToVideo($v["key"], $v["tags"]);
-//        }
-
-         $currentPlaylist = $this->getPlaylist();
-//        foreach ($currentPlaylist as $v) {
-//            $this->deleteTag($v["key"], $v["tags"]);
-//        }
+        // add new videos to playlist
+        foreach ($videoSelection as $v) {
+            $this->addTagToVideo($v["key"], $v["tags"]);
+        }
+        echo "AFTER";
+        print_r($videoSelection);
     }
 
     // return playlist from JWPlatform API, json
-    function getPlaylist () {
-        return $this->jwp_API->call("channels/videos/list", array("channel_key" => $this->channelKey, "result_limit" => 50));
+     function getPlaylist () {
+        return $this->jwp_API->call("channels/videos/list", array(
+            "channel_key" => $this->channelKey,
+            "result_limit" => 50));
     }
 
-    function getLastVideos($startDate) {
-        $videos = $this->jwp_API->call("videos/list", array ("start_date" => $startDate));
+    protected function getLastVideos($startDate) {
+        $videos = $this->jwp_API->call("videos/list", array (
+            "start_date" => $startDate,
+            "statuses_filter" => "ready"));
         return $videos;
     }
 
-    function addTagToVideo ($videoKey, $oldTag) {
-        if (!strpos($this->playlistTag, $oldTag)) {
-//            echo "tag is already present - ";
+    protected function addTagToVideo ($videoKey, $oldTag) {
+        if (strpos($this->playlistTag, $oldTag)) {
+            echo "tag is already present - ";
             return ;
         }
-        $this->jwp_API->call("/videos/update", array("video_key" => $videoKey, "tags" => $oldTag . ', ' . $this->playlistTag));
+        $this->jwp_API->call("/videos/update", array(
+            "video_key" => $videoKey,
+            "tags" => $oldTag . ', ' . $this->playlistTag));
     }
 
-    function deleteTag ($videoKey, $oldTag) {
+    protected function deleteTag ($videoKey, $oldTag) {
+        // if oldTag contain the tag, abort
         if (strpos($this->playlistTag, $oldTag)) {
             return ;
         }
@@ -65,25 +111,37 @@ class AlgoPlaylistKonbini
         unset($tags[array_search($this->playlistTag, $tags)]);
         $newTag = trim(implode(", ", $tags));
 
-        $this->jwp_API->call("/videos/update", array("video_key" => $videoKey, "tags" => $newTag));
+        $this->jwp_API->call("/videos/update", array(
+            "video_key" => $videoKey,
+            "tags" => $newTag));
     }
 
-    function findVideos ($limit) {
-       return $this->jwp_API->call("/videos/list", array("start_date" => $this->getStartDate(), "statuses_filter" => "ready", "result_limit" => $limit));
+    protected function findVideos ($limit, $startDate) {
+       return $this->jwp_API->call("/videos/list", array(
+           "start_date" => $startDate,
+           "statuses_filter" => "ready",
+           "result_limit" => $limit));
     }
 
-    function findSpecificVideo ($category) {
-        return $this->jwp_API->call("/videos/list", array("statuses_filter" => "ready", "search" => $category, "result_limit" => 1000));
+    protected function findSpecificVideo ($category, $limit) {
+        return $this->jwp_API->call("/videos/list", array(
+            "statuses_filter" => "ready",
+            "search" => $category,
+            "result_limit" => $limit,));
     }
 
-    function selectVideos() {
+    protected function selectVideos() {
         $remaining = $this->videosNb;
         $videos = [];
 
-        $fast = $this->findSpecificVideo("fast");
+        $fast = $this->findSpecificVideo("fast", 150);
         for ($i = 0; $i < 2; $i++){
             array_push($videos, $fast["videos"][rand(0, $fast["total"])]);
             $remaining--;
+            // stop if there is no remaining video slot to be filled
+            if ($remaining <= 0) {
+                $i = 2;
+            }
         }
 
         $recentsVideos = $this->jwp_API->call(
@@ -92,9 +150,9 @@ class AlgoPlaylistKonbini
                 "statuses_filter" => "ready",
                 "result_limit" => $remaining));
 
-        $videos = array_merge($videos, $recentsVideos);
+        $videos = array_merge($videos, $recentsVideos["videos"]);
 
-        // if recentsVideos are not enought to fill the playlist, grap randome fast & curious videos.
+        // if recentsVideos are not enought to fill the playlist, grap random fast & curious videos.
         if (count($videos) < $this->videosNb) {
             $remaining = $this->videosNb - count($videos);
             for ($i = 0; $i < $remaining; $i++){
@@ -102,11 +160,12 @@ class AlgoPlaylistKonbini
                 $remaining--;
             }
         }
+
         return $videos;
     }
 
     // return timestamp of (TODAY - daysInterval)
-    function getStartDate () {
+    protected function getStartDate () {
         $startDate = strtotime( '-' . $this->daysInterval . ' day', time());
         return $startDate;
     }
