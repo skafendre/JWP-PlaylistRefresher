@@ -1,11 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Eliott Lambert
- * Date: 26/12/2018
- * Time: 15:49
- */
-
 class AlgoPlaylistKonbini
 {
     protected $jwp_API;
@@ -13,6 +6,7 @@ class AlgoPlaylistKonbini
     protected $channelKey;
     protected $daysInterval;
     protected $videosNb;
+    protected $logs;
 
     /**
      * @param string $playlistTag
@@ -59,29 +53,33 @@ class AlgoPlaylistKonbini
 
     // --> Methods -->
     public function mainLogic () {
-        $videoSelection = $this->selectVideos();
-        $currentPlaylistVideos = $this->getPlaylist()["videos"];
+        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), 'oldPLaylist'); // playlist before change
+        $this->emptyPlaylist();
+        $this->fillPlaylist();
 
-        // retire previous videos from playlist
+//        echo "AFTER";
+//        print_r($videoSelection);
+//        $this->getLogs();
+    }
+
+    function emptyPlaylist () {
+        $currentPlaylistVideos = $this->getPlaylist();
+
         foreach ($currentPlaylistVideos as $v) {
             $this->deleteTag($v["key"], $v["tags"]);
         }
-//        echo "Current";
-//        print_r($currentPlaylistVideos);
 
-        // add new videos to playlist
-        foreach ($videoSelection as $v) {
-            $this->addTagToVideo($v["key"], $v["tags"]);
-        }
-//        echo "AFTER";
-//        print_r($videoSelection);
+        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), 'emptyPlaylist');
     }
+
 
     // return playlist from JWPlatform API, json
      function getPlaylist () {
-        return $this->jwp_API->call("channels/videos/list", array(
-            "channel_key" => $this->channelKey,
-            "result_limit" => 50));
+         $currentPlaylist = $this->jwp_API->call("channels/videos/list", array(
+             "channel_key" => $this->channelKey,
+             "result_limit" => 50));
+
+         return $currentPlaylist["videos"];
     }
 
     protected function getLastVideos($startDate) {
@@ -93,7 +91,6 @@ class AlgoPlaylistKonbini
 
     protected function addTagToVideo ($videoKey, $oldTag) {
         if (strpos($this->playlistTag, $oldTag)) {
-            trigger_error("Tag already present.");
             return ;
         }
         $this->jwp_API->call("/videos/update", array(
@@ -104,7 +101,6 @@ class AlgoPlaylistKonbini
     protected function deleteTag ($videoKey, $oldTag) {
         // if oldTag doesn't contain the tag, abort
         if (strpos($this->playlistTag, $oldTag)) {
-            trigger_error("There is no tag to delete ");
             return ;
         }
 
@@ -162,12 +158,42 @@ class AlgoPlaylistKonbini
             }
         }
 
+        $this->log($this->getParameterOutOfAPIResponse($videos, "title"), "selectVideos");
         return $videos;
+    }
+
+    function fillPlaylist () {
+        $videoSelection = $this->selectVideos();
+
+        foreach ($videoSelection as $v) {
+            $this->addTagToVideo($v["key"], $v["tags"]);
+        }
+        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), "fillPlaylist");
     }
 
     // return timestamp of (TODAY - daysInterval)
     protected function getStartDate () {
         $startDate = strtotime( '-' . $this->daysInterval . ' day', time());
         return $startDate;
+    }
+
+    protected function getParameterOutOfAPIResponse ($array, $apiParameter) {
+        $result = [];
+        foreach ($array as $value) {
+            $result[] = $value[$apiParameter];
+        }
+        return $result;
+    }
+
+    protected function log ($data, $name) {
+//        array_push($this->logs, [$data, $name]);
+        echo "-------------------- FUNCTION " . $name . " -------------------------";
+        print_r($data);
+        $this->logs[] = $data;
+
+    }
+
+    function getLogs () {
+        return print_r($this->logs);
     }
 }
