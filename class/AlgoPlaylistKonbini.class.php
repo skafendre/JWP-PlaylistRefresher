@@ -7,7 +7,16 @@ class AlgoPlaylistKonbini
     protected $channelKey;
     protected $daysInterval;
     protected $videosNb;
+    protected $channelExist;
     protected $logs = [];
+
+    /**
+     * @param mixed $channelExist
+     */
+    public function setChannelExist($channelExist)
+    {
+        $this->channelExist = $channelExist;
+    }
 
     /**
      * @param string $playlistTag
@@ -29,7 +38,7 @@ class AlgoPlaylistKonbini
     public function setChannelKey($channelKey)
     {
         if (empty($channelKey)) {
-            trigger_error("Fatal error, invalid channel key, no playlist found.", 256);
+            $this->endScript("error");
         }
 
         $this->channelKey = $channelKey;
@@ -75,21 +84,40 @@ class AlgoPlaylistKonbini
         $this->setVideosNb($videosNb);
         $this->setPlaylistTag($playlistTag);
         $this->setDaysInterval($daysInterval);
+        $this->verifyCredentials();
     }
 
     // --> Methods -->
 
     public function refreshPlaylist () {
-        // logs for setting and the playlist state before any changes are made
-        $this->printSettings();
+        // log settings and playlist state before any changes are made
         $this->logPlaylist("initial playlist");
 
         // interaction with the API to refresh playlist
         $this->emptyPlaylist();
         $this->fillPlaylist();
+
+        $this->endScript("success");
     }
 
-    function emptyPlaylist () {
+    protected function verifyCredentials () {
+        // dummy call
+        $call = $this->jwp_API->call("channels/show", array("channel_key" => $this->channelKey));
+
+        // if the dummy return an error, end script
+        if ($call["status"] === "error" ) {
+            $this->log($call, __FUNCTION__);
+            // special case when the error concerns the channel_key
+            if (strpos($call["message"], "channel_key")){
+                $this->setChannelExist(false);
+            }
+            $this->endScript("error");
+        } else {
+            $this->channelExist = true;
+        }
+    }
+
+    protected function emptyPlaylist () {
         $currentPlaylistVideos = $this->getPlaylist();
 
         foreach ($currentPlaylistVideos as $v) {
@@ -100,7 +128,7 @@ class AlgoPlaylistKonbini
     }
 
 
-    // return playlist from JWPlatform API, json
+    // return playlist with the settings provided in settings.php
      function getPlaylist () {
          $currentPlaylist = $this->jwp_API->call("channels/videos/list", array(
              "channel_key" => $this->channelKey,
@@ -152,6 +180,7 @@ class AlgoPlaylistKonbini
         return $this->jwp_API->call("/videos/list", array(
             "statuses_filter" => "ready",
             "search" => $category,
+            "order_by" => "views:asc",
             "result_limit" => $limit,));
     }
 
@@ -159,7 +188,7 @@ class AlgoPlaylistKonbini
         $remaining = $this->videosNb;
         $videos = [];
 
-        $fast = $this->findSpecificVideo("fast", 150);
+        $fast = $this->findSpecificVideo("fast", 100);
 
         $recentsVideos = $this->jwp_API->call(
             "/videos/list", array(
@@ -176,7 +205,7 @@ class AlgoPlaylistKonbini
             }
         }
 
-        $this->logPlaylist("selected videos AFTER " . __FUNCTION__);
+        $this->log($this->getParameterOutOfAPIResponse($videos, "title"), "selected videos AFTER " . __FUNCTION__);
         return $videos;
     }
 
@@ -204,6 +233,8 @@ class AlgoPlaylistKonbini
         return $result;
     }
 
+    // -------- LOGS METHODS
+
     protected function setterError () {
         $this->log( debug_backtrace()[1]['function'] . " invalid, default will be applied.", "Setting error");
     }
@@ -227,17 +258,46 @@ class AlgoPlaylistKonbini
         print_r($data);
     }
 
-    protected function printSettings() {
+    // compile settings, return an array
+    protected function getSettings() {
         $settings =  [
             "tag" => $this->playlistTag,
-            "frequency of update" => "every " . $this->daysInterval,
+            "frequency of update" => "every " . $this->daysInterval . " days",
             "playlist ID" => $this->channelKey,
             "number of videos in playlist" => $this->videosNb
         ];
-        $this->printLog($settings, "Settings Used :");
+        return $settings;
     }
 
     function getLogs () {
         return print_r($this->logs);
+    }
+
+    protected function endScript($status) {
+        if ($this->channelExist === true) {
+            $playlist = $this->getParameterOutOfAPIResponse($this->getPlaylist(), "title");
+        } else {
+            $playlist = "playlist not found, please double check \$channelKey in settings.php";
+        }
+
+        // basic response after the script run
+        $response = [
+            "date" => time(),
+            "status" => $status,
+            "settings" => $this->getSettings(),
+            "resulting_playlist" => $playlist,
+        ];
+
+        $this->log($response, "result");
+
+        // always print the basic response, despite a lack of verbose option.
+        global $argv;
+        if (!in_array( "-v", $argv)) {
+            print_r($response);
+        }
+
+        if ($status === "error") {
+            die();
+        }
     }
 }
