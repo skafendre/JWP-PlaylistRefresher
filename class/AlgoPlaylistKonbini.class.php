@@ -1,4 +1,5 @@
 <?php
+
 class AlgoPlaylistKonbini
 {
     protected $jwp_API;
@@ -6,13 +7,18 @@ class AlgoPlaylistKonbini
     protected $channelKey;
     protected $daysInterval;
     protected $videosNb;
-    protected $logs;
+    protected $logs = [];
 
     /**
      * @param string $playlistTag
      */
     public function setPlaylistTag($playlistTag)
     {
+        if (empty($playlistTag) || !is_string($playlistTag)) {
+            $playlistTag = "playlist Konbini (default)";
+            $this->setterError();
+        }
+
         $this->playlistTag = trim($playlistTag);
         $this->jwp_API->call("channels/update", array("channel_key" => $this->channelKey, "tags" => $this->playlistTag));
     }
@@ -22,6 +28,10 @@ class AlgoPlaylistKonbini
      */
     public function setChannelKey($channelKey)
     {
+        if (empty($channelKey)) {
+            trigger_error("Fatal error, invalid channel key, no playlist found.", 256);
+        }
+
         $this->channelKey = $channelKey;
     }
 
@@ -30,6 +40,10 @@ class AlgoPlaylistKonbini
      */
     public function setDaysInterval($daysInterval)
     {
+        if ($daysInterval < 1) {
+            $this->setterError();
+            $daysInterval = 7;
+        }
         $this->daysInterval = $daysInterval;
     }
 
@@ -38,12 +52,24 @@ class AlgoPlaylistKonbini
      */
     public function setVideosNb($videosNb)
     {
+        if ($videosNb < 1) {
+            $videosNb = 10;
+            $this->log("tag invalid, default tag applied :" . $videosNb, __FUNCTION__);
+        }
+
         $this->videosNb = $videosNb;
     }
 
 
-    function __construct($key, $secret, $videosNb, $daysInterval, $playlistTag, $channelKey)
+    function __construct()
     {
+        global $secret;
+        global $key;
+        global $videosNb;
+        global $daysInterval;
+        global $playlistTag;
+        global $channelKey;
+
         $this->jwp_API = new JWPAPI($key, $secret);
         $this->setChannelKey($channelKey);
         $this->setVideosNb($videosNb);
@@ -52,14 +78,15 @@ class AlgoPlaylistKonbini
     }
 
     // --> Methods -->
-    public function mainLogic () {
-        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), 'oldPLaylist'); // playlist before change
+
+    public function refreshPlaylist () {
+        // logs for setting and the playlist state before any changes are made
+        $this->printSettings();
+        $this->logPlaylist("initial playlist");
+
+        // interaction with the API to refresh playlist
         $this->emptyPlaylist();
         $this->fillPlaylist();
-
-//        echo "AFTER";
-//        print_r($videoSelection);
-//        $this->getLogs();
     }
 
     function emptyPlaylist () {
@@ -69,7 +96,7 @@ class AlgoPlaylistKonbini
             $this->deleteTag($v["key"], $v["tags"]);
         }
 
-        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), 'emptyPlaylist');
+        $this->logPlaylist('playlist AFTER ' . __FUNCTION__);
     }
 
 
@@ -132,16 +159,7 @@ class AlgoPlaylistKonbini
         $remaining = $this->videosNb;
         $videos = [];
 
-        // at least 2 F&C in the playlist
         $fast = $this->findSpecificVideo("fast", 150);
-        for ($i = 0; $i < 2; $i++){
-            array_push($videos, $fast["videos"][rand(0, $fast["total"])]);
-            $remaining--;
-            // stop if there is no remaining video slot to be filled
-            if ($remaining <= 0) {
-                $i = 2;
-            }
-        }
 
         $recentsVideos = $this->jwp_API->call(
             "/videos/list", array(
@@ -158,7 +176,7 @@ class AlgoPlaylistKonbini
             }
         }
 
-        $this->log($this->getParameterOutOfAPIResponse($videos, "title"), "selectVideos");
+        $this->logPlaylist("selected videos AFTER " . __FUNCTION__);
         return $videos;
     }
 
@@ -168,13 +186,13 @@ class AlgoPlaylistKonbini
         foreach ($videoSelection as $v) {
             $this->addTagToVideo($v["key"], $v["tags"]);
         }
-        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), "fillPlaylist");
+
+        $this->logPlaylist("updated playlist AFTER " . __FUNCTION__);
     }
 
     // return timestamp of (TODAY - daysInterval)
     protected function getStartDate () {
-        $startDate = strtotime( '-' . $this->daysInterval . ' day', time());
-        return $startDate;
+        return strtotime( '-' . $this->daysInterval . ' day', time());
     }
 
     protected function getParameterOutOfAPIResponse ($array, $apiParameter) {
@@ -182,15 +200,41 @@ class AlgoPlaylistKonbini
         foreach ($array as $value) {
             $result[] = $value[$apiParameter];
         }
+
         return $result;
     }
 
-    protected function log ($data, $name) {
-//        array_push($this->logs, [$data, $name]);
-        echo "-------------------- FUNCTION " . $name . " -------------------------";
-        print_r($data);
-        $this->logs[] = $data;
+    protected function setterError () {
+        $this->log( debug_backtrace()[1]['function'] . " invalid, default will be applied.", "Setting error");
+    }
 
+    protected function logPlaylist ($message) {
+        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), $message);
+    }
+
+    protected function log ($data, $name) {
+        global $argv;
+        if (in_array( "-v", $argv)) {
+            $this->printLog($data, $name);
+        }
+        array_push($this->logs, [$data, $name]);
+
+        $this->logs[] = $data;
+    }
+
+    protected function printLog($data, $name) {
+        echo " --- " . $name . " ---" . PHP_EOL;
+        print_r($data);
+    }
+
+    protected function printSettings() {
+        $settings =  [
+            "tag" => $this->playlistTag,
+            "frequency of update" => "every " . $this->daysInterval,
+            "playlist ID" => $this->channelKey,
+            "number of videos in playlist" => $this->videosNb
+        ];
+        $this->printLog($settings, "Settings Used :");
     }
 
     function getLogs () {
