@@ -9,7 +9,6 @@ class AlgoPlaylistKonbini
     protected $videosNb;
 
     protected $channelExist;
-    protected $initialPlaylist;
     protected $response = [];
 
     /**
@@ -282,7 +281,6 @@ class AlgoPlaylistKonbini
             "timestamp" => time(),
             "status" => $status,
             "settings" => $this->getSettings(),
-            "initial_playlist" => $this->initialPlaylist,
             "resulting_playlist" => $playlist,
         ];
         $this->response = array_merge($this->response, $completeResponse);
