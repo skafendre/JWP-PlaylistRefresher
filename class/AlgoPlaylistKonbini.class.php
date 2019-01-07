@@ -91,8 +91,8 @@ class AlgoPlaylistKonbini
 
     public function refreshPlaylist () {
         // log settings and playlist state before any changes are made
+        $this->response["initial_playlist"] = $this->getParameterOutOfAPIResponse($this->getPlaylist(), "title");
         $this->logPlaylist("initial playlist");
-        $this->initialPlaylist = $this->getParameterOutOfAPIResponse($this->getPlaylist(), "title");
 
         // interaction with the API to refresh playlist
         $this->emptyPlaylist();
@@ -142,7 +142,9 @@ class AlgoPlaylistKonbini
     protected function getLastVideos($startDate) {
         $videos = $this->jwp_API->call("videos/list", array (
             "start_date" => $startDate,
-            "statuses_filter" => "ready"));
+            "statuses_filter" => "ready",
+            "order_by" => "views:asc",
+        ));
         return $videos;
     }
 
@@ -157,9 +159,6 @@ class AlgoPlaylistKonbini
     }
 
     protected function deleteTag ($videoKey, $oldTag) {
-        // if oldTag doesn't contain the tag, abort
-
-
         // reconstruct clean tags
         $tags = explode(", ", $oldTag);
         unset($tags[array_search($this->playlistTag, $tags)]);
@@ -248,11 +247,11 @@ class AlgoPlaylistKonbini
     protected function consoleLog ($data, $name) {
         global $argv;
         if (in_array( "-v", $argv)) {
-            $this->printLog($data, $name);
+            $this->printConsoleLog($data, $name);
         }
     }
 
-    protected function printLog($data, $name) {
+    protected function printConsoleLog($data, $name) {
         echo " --- " . $name . " ---" . PHP_EOL;
         print_r($data);
     }
