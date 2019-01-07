@@ -11,8 +11,10 @@ Project composed of :
 
 2) AlgoPlaylistKonbini.class.php
     Class which dictacte API calls in order to select and refresh a playlist.
-    Take 6 parameters $key, $secret, $videosNb, $daysInterval, $playlistTag, $channelKey
+    Use settings.php to set $videosNb, $daysInterval, $playlistTag, $channelKey.
     $daysInterval needs to be implemented with a cron in order to be effective.
 
 3) main.php
     Creation of an AlgoPlaylistKonbini object, which update the playlist.
+    Executing the script with "-v" to display more log in the console.
+    Logs saved in log/log.txt, find update via timestamp.
