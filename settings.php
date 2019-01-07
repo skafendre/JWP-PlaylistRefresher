@@ -1,6 +1,6 @@
 <?php
 
-$playlistTag = "playlist Konbini";
+$playlistTag = "";
 $channelKey = 'GOHRhAkf';
 $daysInterval = 7;
 $videosNb = 10;

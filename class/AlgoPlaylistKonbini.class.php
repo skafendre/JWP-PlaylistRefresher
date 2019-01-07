@@ -7,8 +7,10 @@ class AlgoPlaylistKonbini
     protected $channelKey;
     protected $daysInterval;
     protected $videosNb;
+
     protected $channelExist;
-    protected $logs = [];
+    protected $initialPlaylist;
+    protected $response = [];
 
     /**
      * @param mixed $channelExist
@@ -25,7 +27,7 @@ class AlgoPlaylistKonbini
     {
         if (empty($playlistTag) || !is_string($playlistTag)) {
             $playlistTag = "playlist Konbini (default)";
-            $this->setterError();
+            $this->setterError("tag");
         }
 
         $this->playlistTag = trim($playlistTag);
@@ -50,7 +52,7 @@ class AlgoPlaylistKonbini
     public function setDaysInterval($daysInterval)
     {
         if ($daysInterval < 1) {
-            $this->setterError();
+            $this->setterError("days_interval");
             $daysInterval = 7;
         }
         $this->daysInterval = $daysInterval;
@@ -63,12 +65,11 @@ class AlgoPlaylistKonbini
     {
         if ($videosNb < 1) {
             $videosNb = 10;
-            $this->log("tag invalid, default tag applied :" . $videosNb, __FUNCTION__);
+            $this->setterError("videos_number");
         }
 
         $this->videosNb = $videosNb;
     }
-
 
     function __construct()
     {
@@ -92,6 +93,7 @@ class AlgoPlaylistKonbini
     public function refreshPlaylist () {
         // log settings and playlist state before any changes are made
         $this->logPlaylist("initial playlist");
+        $this->initialPlaylist = $this->getParameterOutOfAPIResponse($this->getPlaylist(), "title");
 
         // interaction with the API to refresh playlist
         $this->emptyPlaylist();
@@ -106,12 +108,13 @@ class AlgoPlaylistKonbini
 
         // if the dummy return an error, end script
         if ($call["status"] === "error" ) {
-            $this->log($call, __FUNCTION__);
+            $this->consoleLog($call, __FUNCTION__);
             // special case when the error concerns the channel_key
             if (strpos($call["message"], "channel_key")){
                 $this->setChannelExist(false);
             }
             $this->endScript("error");
+            $this->setterError($call["message"]);
         } else {
             $this->channelExist = true;
         }
@@ -148,6 +151,7 @@ class AlgoPlaylistKonbini
         if (strpos($this->playlistTag, $oldTag)) {
             return ;
         }
+
         $this->jwp_API->call("/videos/update", array(
             "video_key" => $videoKey,
             "tags" => $oldTag . ', ' . $this->playlistTag));
@@ -155,9 +159,7 @@ class AlgoPlaylistKonbini
 
     protected function deleteTag ($videoKey, $oldTag) {
         // if oldTag doesn't contain the tag, abort
-        if (strpos($this->playlistTag, $oldTag)) {
-            return ;
-        }
+
 
         // reconstruct clean tags
         $tags = explode(", ", $oldTag);
@@ -205,7 +207,7 @@ class AlgoPlaylistKonbini
             }
         }
 
-        $this->log($this->getParameterOutOfAPIResponse($videos, "title"), "selected videos AFTER " . __FUNCTION__);
+        $this->consoleLog($this->getParameterOutOfAPIResponse($videos, "title"), "selected videos AFTER " . __FUNCTION__);
         return $videos;
     }
 
@@ -235,22 +237,20 @@ class AlgoPlaylistKonbini
 
     // -------- LOGS METHODS
 
-    protected function setterError () {
-        $this->log( debug_backtrace()[1]['function'] . " invalid, default will be applied.", "Setting error");
+    // log error into the response array
+    protected function setterError ($errorOrigin) {
+        $this->response["errors"][$errorOrigin] = debug_backtrace()[1]['function'] . " provided with invalid parameter, default [" . $errorOrigin . "] used.";
     }
 
     protected function logPlaylist ($message) {
-        $this->log($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), $message);
+        $this->consoleLog($this->getParameterOutOfAPIResponse($this->getPlaylist(), "title"), $message);
     }
 
-    protected function log ($data, $name) {
+    protected function consoleLog ($data, $name) {
         global $argv;
         if (in_array( "-v", $argv)) {
             $this->printLog($data, $name);
         }
-        array_push($this->logs, [$data, $name]);
-
-        $this->logs[] = $data;
     }
 
     protected function printLog($data, $name) {
@@ -269,10 +269,6 @@ class AlgoPlaylistKonbini
         return $settings;
     }
 
-    function getLogs () {
-        return print_r($this->logs);
-    }
-
     protected function endScript($status) {
         if ($this->channelExist === true) {
             $playlist = $this->getParameterOutOfAPIResponse($this->getPlaylist(), "title");
@@ -280,24 +276,57 @@ class AlgoPlaylistKonbini
             $playlist = "playlist not found, please double check \$channelKey in settings.php";
         }
 
-        // basic response after the script run
-        $response = [
-            "date" => time(),
+        // basic response displayed after the script end
+        $completeResponse = [
+            "date" => date("F j, Y, g:i a"),
+            "timestamp" => time(),
             "status" => $status,
             "settings" => $this->getSettings(),
+            "initial_playlist" => $this->initialPlaylist,
             "resulting_playlist" => $playlist,
         ];
+        $this->response = array_merge($this->response, $completeResponse);
 
-        $this->log($response, "result");
+        $this->printLogInFile();
 
-        // always print the basic response, despite a lack of verbose option.
+        // always print a basic response, despite a lack of verbose option.
         global $argv;
         if (!in_array( "-v", $argv)) {
-            print_r($response);
+            if (array_key_exists("errors", $this->response)) {
+                foreach($this->response["errors"] as $key=>$value) {
+                    echo "[" . $key . "] error : " . $value, " \n";
+                }
+            }
+            echo "Refresh status : " . $this->response["status"] . ", timestamp : " . $this->response["timestamp"];
+        } else {
+            echo $this->formatLogs();
         }
 
         if ($status === "error") {
             die();
         }
+    }
+
+    protected function formatLogs () {
+        $formatedContents = $this->response["date"] . ", " . $this->response["timestamp"] . " \n";
+        foreach ($this->response as $key => $value) {
+            if (is_array($value)) {
+                $formatedContents .= trim($key). "=> array : \n";
+                foreach ($value as $key1 => $value1) {
+                    $formatedContents .= "\t " . trim($key1) . " => " . trim($value1) . " \n";
+                }
+            } else {
+                $formatedContents .= trim($key) . " => " . trim($value) . " \n ";
+            }
+        }
+        return $formatedContents;
+    }
+
+    // create log.txt and the folder if they don't exist, then print log to the file.
+    protected function printLogInFile () {
+        if (!file_exists('log/')) {
+            mkdir('log/', 0777, true);
+        }
+        file_put_contents("log/log.txt", $this->formatLogs() ."\n \n", FILE_APPEND);
     }
 }
