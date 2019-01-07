@@ -112,8 +112,8 @@ class AlgoPlaylistKonbini
             if (strpos($call["message"], "channel_key")){
                 $this->setChannelExist(false);
             }
+            $this->response["errors"][$call["code"]] = $call["message"];
             $this->endScript("error");
-            $this->setterError($call["message"]);
         } else {
             $this->channelExist = true;
         }
@@ -286,9 +286,10 @@ class AlgoPlaylistKonbini
 
         $this->printLogInFile();
 
-        // always print a basic response, despite a lack of verbose option.
+        // console response
         global $argv;
         if (!in_array( "-v", $argv)) {
+            // non verbose
             if (array_key_exists("errors", $this->response)) {
                 foreach($this->response["errors"] as $key=>$value) {
                     echo "[" . $key . "] error : " . $value, " \n";
@@ -296,9 +297,11 @@ class AlgoPlaylistKonbini
             }
             echo "Refresh status : " . $this->response["status"] . ", timestamp : " . $this->response["timestamp"];
         } else {
+            // verbose
             echo $this->formatLogs();
         }
 
+        // stop script if it ended with an error
         if ($status === "error") {
             die();
         }
