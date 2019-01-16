@@ -35,4 +35,20 @@ class Logger {
         }
         file_put_contents("log/log.txt", $this->formatLogs() ."\n \n", FILE_APPEND);
     }
+
+    function displayLogInConsole () {
+         global $argv;
+        if (!in_array( "-v", $argv)) {
+            // non verbose
+            if (array_key_exists("errors", $this->logs)) {
+                foreach($this->logs["errors"] as $key=>$value) {
+                    echo "[" . $key . "] error : " . $value, " \n";
+                }
+            }
+            echo "Refresh status : " . $this->logs["status"] . ", timestamp : " . $this->logs["timestamp"];
+        } else {
+            // verbose
+            echo $this->formatLogs();
+        }
+    }
 }

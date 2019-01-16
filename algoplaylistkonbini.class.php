@@ -1,0 +1,214 @@
+<?php
+
+/*
+ * Error functions in php ?
+ * ||---> ???
+ * Serializer like separate class for API calls
+ * ||---> partial
+ * PHP default variables in functions
+ * ||---> done
+ * Logs functions in separate file
+ * ||---> done
+ * Settings verifications in a separate file and/or in a separate function? -> in a class, which verify?
+ * ||---> done
+ * Verify protected/private/public
+ * ||--->
+ */
+
+require_once "class/logger.class.php";
+require_once "jw-platform-wrapper/jwpwrapper.class.php";
+
+// !!!!!!!!!!!! STARTED JWPLATFORMWRAPPEPR, code here lack jwp-api !!!!!!!!!!!!!!!!!!!!!!
+
+class AlgoPlaylistKonbini
+{
+    protected $logger;
+    protected $playlistSettings;
+    protected $jwpWrapper;
+
+    protected $channelExist;
+
+    /**
+     * @param mixed $channelExist
+     */
+    public function setChannelExist($channelExist)
+    {
+        $this->channelExist = $channelExist;
+    }
+
+    function __construct()
+    {
+        global $playlistSettings;
+
+        if ($playlistSettings->getCheckedSettings()["areValid"] === false) {
+            $this->endScript("error");
+        }
+        $this->playlistSettings = $playlistSettings;
+        
+        $this->jwpWrapper = new JWPWrapper();
+        $this->logger = new Logger();
+        $this->verifyCredentials();
+    }
+
+    // --> Methods -->
+
+    public function refreshPlaylist () {
+        // log settings and playlist state before any changes are made
+//        $this->logger->logs["initial_playlist"] = $this->getParameterOutOfAPIResponse($this->jwpWrapper->videos->fetchById($this->playlistSettings), "title");
+
+        echo "---------- fetch by id?";
+        $this->logger->logs["initial_playlist"] = $this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title");
+
+        print_r($this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title"));
+
+        // interaction with the API to refresh playlist
+        $this->emptyPlaylist();
+        $this->fillPlaylist();
+
+        $this->endScript("success");
+    }
+
+    protected function verifyCredentials () {
+        // dummy call
+        $response = $this->jwpWrapper->channels->fetchById($this->playlistSettings->channelKey);
+
+        // if the dummy return an error, end script
+        if ($response["status"] === "error" ) {
+            $this->logger->consoleLog($response, __FUNCTION__);
+            // special case when the error concerns the channel_key
+            if (strpos($response["message"], "channel_key")){
+                $this->setChannelExist(false);
+            }
+            $this->logger->logs["errors"][$response["code"]] = $response["message"];
+            $this->endScript("error");
+        } else {
+            $this->channelExist = true;
+        }
+    }
+
+    protected function emptyPlaylist () {
+        $currentPlaylistVideos = $this->jwpWrapper->channels->fetchById($this->playlistSettings->channelKey);
+
+        foreach ($currentPlaylistVideos as $v) {
+            $this->deleteTag($v["key"], $v["tags"]);
+        }
+
+    }
+
+    protected function addTagToVideo ($video, $oldTag) {
+        if (strpos($this->playlistSettings->playlistTag, $oldTag)) {
+            return ;
+        }
+
+        $newTag = $oldTag . ', ' . $this->playlistSettings->playlistTag;
+        $this->jwpWrapper->videos->setTags($video, $newTag);
+    }
+
+    protected function deleteTag ($video, $oldTag) {
+        // reconstruct clean tags
+        $tags = explode(", ", $oldTag);
+        unset($tags[array_search($this->playlistSettings->playlistTag, $tags)]);
+        $newTag = trim(implode(", ", $tags));
+
+        $this->jwpWrapper->videos->setTags($video, $newTag);
+    }
+
+//    protected function findVideos ($limit, $startDate) {
+//       return $this->jwp_API->call("/videos/list", array(
+//           "start_date" => $startDate,
+//           "statuses_filter" => "ready",
+//           "result_limit" => $limit));
+//    }
+
+//    protected function findSpecificVideo ($category, $limit) {
+//        return $this->jwp_API->call("/videos/list", array(
+//            "statuses_filter" => "ready",
+//            "search" => $category,
+//            "order_by" => "views:asc",
+//            "result_limit" => $limit,));
+//    }
+
+    protected function selectVideos() {
+        $remaining = $this->playlistSettings->videosNb;
+        $videos = [];
+
+        $fast = $this->jwpWrapper->videos->fetchVideoByKeyword("fast", 30);
+        $recentsVideos = $this->jwpWrapper->videos->fetchByStartDate($this->getStartDate(), $remaining);
+
+        $videos = array_merge($videos, $recentsVideos["videos"]);
+
+        // if recentsVideos are not enought to fill the playlist, grap random fast & curious videos.
+        if (count($videos) < $this->playlistSettings->videosNb) {
+            $remaining = $this->playlistSettings->videosNb - count($videos);
+            for ($i = 0; $i < $remaining; $i++){
+                array_push($videos, $fast["videos"][rand(0, $fast["total"])]);
+            }
+        }
+
+        $this->logger->consoleLog($this->getParameterOutOfAPIResponse($videos, "title"), "selected videos AFTER " . __FUNCTION__);
+        return $videos;
+    }
+
+    function fillPlaylist () {
+        $videoSelection = $this->selectVideos();
+
+        foreach ($videoSelection as $v) {
+            $this->addTagToVideo($v["key"], $v["tags"]);
+        }
+    }
+
+    // return timestamp of (TODAY - daysInterval)
+    protected function getStartDate () {
+        return strtotime( '-' . $this->playlistSettings->daysInterval . ' day', time());
+    }
+
+    protected function getParameterOutOfAPIResponse ($array, $apiParameter) {
+        $result = [];
+        foreach ($array as $value) {
+            $result[] = $value[$apiParameter];
+        }
+        return $result;
+    }
+
+    // log error into the response array
+    protected function setterError ($errorOrigin) {
+        $this->logger->logs["errors"][$errorOrigin] = debug_backtrace()[1]['function'] . " provided with invalid parameter, default [" . $errorOrigin . "] used.";
+    }
+
+    protected function endScript($status) {
+        if ($this->channelExist === true) {
+            $playlist = $this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchById($this->playlistSettings->channelKey), "title");
+        } else {
+            $playlist = "playlist not found, please double check \$channelKey in settings.php";
+        }
+
+        $endScriptLog = [
+            "date" => date("F j, Y, g:i a"),
+            "timestamp" => time(),
+            "status" => $status,
+            "settings" => $this->playlistSettings->getSettings(),
+            "resulting_playlist" => $playlist,
+        ];
+        $this->logger->logs = array_merge($this->logger->logs, $endScriptLog);
+        $this->logger->printLogInFile();
+
+//        global $argv;
+//        if (!in_array( "-v", $argv)) {
+//            // non verbose
+//            if (array_key_exists("errors", $this->logger->logs)) {
+//                foreach($this->logger->logs["errors"] as $key=>$value) {
+//                    echo "[" . $key . "] error : " . $value, " \n";
+//                }
+//            }
+//            echo "Refresh status : " . $this->logger->logs["status"] . ", timestamp : " . $this->logger->logs["timestamp"];
+//        } else {
+//            // verbose
+//            echo $this->logger->formatLogs();
+//        }
+        $this->logger->displayLogInConsole();
+
+        if ($status === "error") {
+            die();
+        }
+    }
+}
