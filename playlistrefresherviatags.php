@@ -1,25 +1,9 @@
 <?php
 
-/*
- * Error functions in php ?
- * ||---> ???
- * Serializer like separate class for API calls
- * ||---> done
- * PHP default variables in functions
- * ||---> done
- * Logs functions in separate file
- * ||---> done
- * Settings verifications in a separate file and/or in a separate function? -> in a class, which verify?
- * ||---> done
- * Verify private/private/public
- * ||---> 
- */
-
 require_once "class/logger.class.php";
 require_once "jw-platform-wrapper/jwpwrapper.class.php";
 
-// !!!!!!!!!!!! STARTED JWPLATFORMWRAPPEPR, code here lack jwp-api !!!!!!!!!!!!!!!!!!!!!!
-
+// Refresh a JW playlist with the settings provided in settings.php
 class PlaylistRefresherByTags
 {
     private $logger;
