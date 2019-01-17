@@ -1,10 +1,10 @@
 <?php
 
-require_once('algoplaylistkonbini.class.php');
+require_once('playlistrefresherviatags.php');
 require_once('settings.php');
 require_once('credentials.php');
 
-$algo = new AlgoPlaylistKonbini();
+$algo = new PlaylistRefresherByTags();
 $algo->refreshPlaylist();
 
 //$testOutput = $test->videos->fetch(10);

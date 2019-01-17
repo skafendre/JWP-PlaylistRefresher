@@ -4,15 +4,15 @@
  * Error functions in php ?
  * ||---> ???
  * Serializer like separate class for API calls
- * ||---> partial
+ * ||---> done
  * PHP default variables in functions
  * ||---> done
  * Logs functions in separate file
  * ||---> done
  * Settings verifications in a separate file and/or in a separate function? -> in a class, which verify?
  * ||---> done
- * Verify protected/private/public
- * ||--->
+ * Verify private/private/public
+ * ||---> 
  */
 
 require_once "class/logger.class.php";
@@ -20,13 +20,13 @@ require_once "jw-platform-wrapper/jwpwrapper.class.php";
 
 // !!!!!!!!!!!! STARTED JWPLATFORMWRAPPEPR, code here lack jwp-api !!!!!!!!!!!!!!!!!!!!!!
 
-class AlgoPlaylistKonbini
+class PlaylistRefresherByTags
 {
-    protected $logger;
-    protected $playlistSettings;
-    protected $jwpWrapper;
+    private $logger;
+    private $playlistSettings;
+    private $jwpWrapper;
 
-    protected $channelExist;
+    private $channelExist;
 
     /**
      * @param mixed $channelExist
@@ -54,24 +54,15 @@ class AlgoPlaylistKonbini
 
     public function refreshPlaylist () {
         // log settings and playlist state before any changes are made
-//        $this->logger->logs["initial_playlist"] = $this->getParameterOutOfAPIResponse($this->jwpWrapper->videos->fetchById($this->playlistSettings), "title");
-
-        echo "---------- fetch by id?";
         $this->logger->logs["initial_playlist"] = $this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title");
-
-        print_r($this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title"));
-
-        // interaction with the API to refresh playlist
         $this->emptyPlaylist();
         $this->fillPlaylist();
-
         $this->endScript("success");
     }
 
-    protected function verifyCredentials () {
+    private function verifyCredentials () {
         // dummy call
-        $response = $this->jwpWrapper->channels->fetchById($this->playlistSettings->channelKey);
-
+        $response = $this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey, true);
         // if the dummy return an error, end script
         if ($response["status"] === "error" ) {
             $this->logger->consoleLog($response, __FUNCTION__);
@@ -86,16 +77,15 @@ class AlgoPlaylistKonbini
         }
     }
 
-    protected function emptyPlaylist () {
-        $currentPlaylistVideos = $this->jwpWrapper->channels->fetchById($this->playlistSettings->channelKey);
-
+    private function emptyPlaylist () {
+        $currentPlaylistVideos = $this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey);
         foreach ($currentPlaylistVideos as $v) {
             $this->deleteTag($v["key"], $v["tags"]);
         }
 
     }
 
-    protected function addTagToVideo ($video, $oldTag) {
+    private function addTagToVideo ($video, $oldTag) {
         if (strpos($this->playlistSettings->playlistTag, $oldTag)) {
             return ;
         }
@@ -104,7 +94,7 @@ class AlgoPlaylistKonbini
         $this->jwpWrapper->videos->setTags($video, $newTag);
     }
 
-    protected function deleteTag ($video, $oldTag) {
+    private function deleteTag ($video, $oldTag) {
         // reconstruct clean tags
         $tags = explode(", ", $oldTag);
         unset($tags[array_search($this->playlistSettings->playlistTag, $tags)]);
@@ -113,22 +103,7 @@ class AlgoPlaylistKonbini
         $this->jwpWrapper->videos->setTags($video, $newTag);
     }
 
-//    protected function findVideos ($limit, $startDate) {
-//       return $this->jwp_API->call("/videos/list", array(
-//           "start_date" => $startDate,
-//           "statuses_filter" => "ready",
-//           "result_limit" => $limit));
-//    }
-
-//    protected function findSpecificVideo ($category, $limit) {
-//        return $this->jwp_API->call("/videos/list", array(
-//            "statuses_filter" => "ready",
-//            "search" => $category,
-//            "order_by" => "views:asc",
-//            "result_limit" => $limit,));
-//    }
-
-    protected function selectVideos() {
+    private function selectVideos() {
         $remaining = $this->playlistSettings->videosNb;
         $videos = [];
 
@@ -158,11 +133,11 @@ class AlgoPlaylistKonbini
     }
 
     // return timestamp of (TODAY - daysInterval)
-    protected function getStartDate () {
+    private function getStartDate () {
         return strtotime( '-' . $this->playlistSettings->daysInterval . ' day', time());
     }
 
-    protected function getParameterOutOfAPIResponse ($array, $apiParameter) {
+    private function getParameterOutOfAPIResponse ($array, $apiParameter) {
         $result = [];
         foreach ($array as $value) {
             $result[] = $value[$apiParameter];
@@ -170,16 +145,11 @@ class AlgoPlaylistKonbini
         return $result;
     }
 
-    // log error into the response array
-    protected function setterError ($errorOrigin) {
-        $this->logger->logs["errors"][$errorOrigin] = debug_backtrace()[1]['function'] . " provided with invalid parameter, default [" . $errorOrigin . "] used.";
-    }
-
-    protected function endScript($status) {
+    private function endScript($status) {
         if ($this->channelExist === true) {
-            $playlist = $this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchById($this->playlistSettings->channelKey), "title");
+            $playlist = $this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title");
         } else {
-            $playlist = "playlist not found, please double check \$channelKey in settings.php";
+            $playlist = "playlist not found";
         }
 
         $endScriptLog = [
@@ -191,20 +161,7 @@ class AlgoPlaylistKonbini
         ];
         $this->logger->logs = array_merge($this->logger->logs, $endScriptLog);
         $this->logger->printLogInFile();
-
-//        global $argv;
-//        if (!in_array( "-v", $argv)) {
-//            // non verbose
-//            if (array_key_exists("errors", $this->logger->logs)) {
-//                foreach($this->logger->logs["errors"] as $key=>$value) {
-//                    echo "[" . $key . "] error : " . $value, " \n";
-//                }
-//            }
-//            echo "Refresh status : " . $this->logger->logs["status"] . ", timestamp : " . $this->logger->logs["timestamp"];
-//        } else {
-//            // verbose
-//            echo $this->logger->formatLogs();
-//        }
+        
         $this->logger->displayLogInConsole();
 
         if ($status === "error") {

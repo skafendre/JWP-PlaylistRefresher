@@ -6,12 +6,13 @@ class PlaylistSettings {
     public $videosNb;
 
     function getSettings () {
-        return $settings = [
+        $settings = [
             "playlist_tag" => $this->playlistTag,
             "playlist_id" => $this->channelKey,
             "videos_number" => $this->videosNb,
             "update_frequency" => $this->daysInterval
         ];
+        return $settings;
     }
 
     public function getCheckedSettings () {
@@ -21,7 +22,7 @@ class PlaylistSettings {
             $invalidSettings["playlist_tag"] = "Invalid playlist tag";
         }
 
-        if (empty($this->channelKey) ) {
+        if (empty($this->channelKey || is_null($this->channelKey)) ) {
             $invalidSettings["playlist_id"] = "Invalid playlist ID";
         }
 
@@ -35,9 +36,9 @@ class PlaylistSettings {
 
         // "areValid" is checked by CheckSettings in AlgoPlaylistKonbini
         if (count($invalidSettings) >= 1) {
-            return array ("areValid" => false, $invalidSettings);
+            return array ("areValid" => 0, "settings" => $invalidSettings);
         } else {
-            return array ("areValid" => true, $this->getSettings());
+            return array ("areValid" => 1, "settings" => $this->getSettings());
         }
     }
 }

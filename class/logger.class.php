@@ -10,7 +10,7 @@ class Logger {
     }
 
      function printConsoleLog($data, $name) {
-        echo " --- " . $name . " ---" . PHP_EOL;
+        echo " --- FUNCTION " . $name . " ---" . PHP_EOL;
         print_r($data);
     }
 
