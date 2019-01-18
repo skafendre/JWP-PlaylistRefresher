@@ -17,13 +17,13 @@ $playlistSettings->videosNb = "NUMBER OF VIDEOS (int);
 //$playlistSettings->videosNb = 10;
 
 // dev settings
-//$playlistSettings->playlistTag = "algo test bot";
-//$playlistSettings->channelKey = 'JKltxRtB';
-//$playlistSettings->daysInterval = 7;
-//$playlistSettings->videosNb = 10;
+$playlistSettings->playlistTag = "algo test bot";
+$playlistSettings->channelKey = 'JKltxRtB';
+$playlistSettings->daysInterval = 7;
+$playlistSettings->videosNb = 10;
 
 // wrong settings
-$playlistSettings->playlistTag = "test";
-$playlistSettings->channelKey = '48';
-$playlistSettings->daysInterval = -1;
-$playlistSettings->videosNb = 10;
+//$playlistSettings->playlistTag = "test";
+//$playlistSettings->channelKey = 'zds';
+//$playlistSettings->daysInterval = -1;
+//$playlistSettings->videosNb = 10;
