@@ -52,4 +52,11 @@ class JWPChannels extends JWPBase {
             return $response["videos"];
         }
     }
+
+    function fetchChannelType ($id) {
+        $response = $this->jwp_API->call("channels/show", array(
+            "channel_key" => $id
+        ));
+        return $response["channel"]["type"];
+    }
 }
