@@ -1,6 +1,7 @@
 <?php
 
 require_once "logger.class.php";
+require_once "playlistsettings.class.php";
 require_once("jw-platform-wrapper/jwpwrapper.class.php");
 
 // Refresh a JW playlist with the settings provided in settings.php
@@ -35,7 +36,7 @@ class PlaylistRefresherByTags
 
     public function refreshPlaylist () {
         // log settings and playlist state before any changes are made
-        $this->logger->logs["initial_playlist"] = $this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title");
+        $this->logger->logs["initial_playlist"] = $this->getParamRes($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title");
         $this->emptyPlaylist();
         $this->fillPlaylist();
         $this->endScript("success");
@@ -74,20 +75,20 @@ class PlaylistRefresherByTags
         $remaining = $this->playlistSettings->videosNb;
         $videos = [];
 
-        $fast = $this->jwpWrapper->videos->fetchVideoByKeyword("fast", 30);
         $recentsVideos = $this->jwpWrapper->videos->fetchByStartDate($this->getStartDate(), $remaining);
 
         $videos = array_merge($videos, $recentsVideos["videos"]);
 
         // if recentsVideos are not enought to fill the playlist, grap random fast & curious videos.
         if (count($videos) < $this->playlistSettings->videosNb) {
+            $fast = $this->jwpWrapper->videos->fetchVideoByKeyword("fast", 30);
             $remaining = $this->playlistSettings->videosNb - count($videos);
             for ($i = 0; $i < $remaining; $i++){
                 array_push($videos, $fast["videos"][rand(0, $fast["total"])]);
             }
         }
 
-        $this->logger->consoleLog($this->getParameterOutOfAPIResponse($videos, "title"), "selected videos AFTER " . __FUNCTION__);
+        $this->logger->consoleLog($this->getParamRes($videos, "title"), "selected videos AFTER " . __FUNCTION__);
         return $videos;
     }
 
@@ -109,7 +110,7 @@ class PlaylistRefresherByTags
         return strtotime( '-' . $this->playlistSettings->daysInterval . ' day', time());
     }
 
-    private function getParameterOutOfAPIResponse ($array, $apiParameter) {
+    private function getParamRes ($array, $apiParameter) {
         $result = [];
         foreach ($array as $value) {
             $result[] = $value[$apiParameter];
@@ -119,7 +120,7 @@ class PlaylistRefresherByTags
 
     private function endScript($status) {
         if ($this->channelExist === true) {
-            $playlist = $this->getParameterOutOfAPIResponse($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title");
+            $playlist = $this->getParamRes($this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey), "title");
         } else {
             $playlist = "playlist not found";
         }

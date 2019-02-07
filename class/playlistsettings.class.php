@@ -1,7 +1,5 @@
 <?php
 
-require_once $_SERVER['DOCUMENT_ROOT']."settings.php";
-
 class PlaylistSettings {
 
     function __construct()
