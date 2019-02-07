@@ -1,0 +1,20 @@
+{
+  "under_article_konbini" : {
+    "playlist_tag" : "playlist Konbini",
+    "channel_key" : "GOHRhAkf",
+    "days_interval" : "7",
+    "videos_number" : "10"
+  },
+  "dev" : {
+    "playlist_tag" : "algo test bot",
+    "channel_key" : "JKltxRtB",
+    "days_interval" : "7",
+    "videos_number" : "10"
+  },
+  "invalids" : {
+    "playlist_tag" : "test",
+    "channel_key" : "no",
+    "days_interval" : -20,
+    "videos_number" : null
+  }
+}

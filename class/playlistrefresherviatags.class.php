@@ -7,14 +7,11 @@ require_once("jw-platform-wrapper/jwpwrapper.class.php");
 class PlaylistRefresherByTags
 {
     private $logger;
-    private $playlistSettings;
+    public $playlistSettings;
     private $jwpWrapper;
 
     private $channelExist;
 
-    /**
-     * @param mixed $channelExist
-     */
     public function setChannelExist($channelExist)
     {
         $this->channelExist = $channelExist;
@@ -22,15 +19,15 @@ class PlaylistRefresherByTags
 
     function __construct()
     {
-        global $playlistSettings;
-
-        if ($playlistSettings->getCheckedSettings()["areValid"] === false) {
-            $this->endScript("error");
-        }
-        $this->playlistSettings = $playlistSettings;
-        
         $this->jwpWrapper = new JWPWrapper();
         $this->logger = new Logger();
+        $this->playlistSettings = new PlaylistSettings();
+
+        if ($test = $this->playlistSettings->getInvalidsSettings()["areValid"] === 0) {
+
+            $this->logger->logs["errors"] = $this->playlistSettings->getInvalidsSettings()["settings"];
+        }
+
         $this->verifyCredentials();
     }
 
@@ -64,27 +61,13 @@ class PlaylistRefresherByTags
     private function emptyPlaylist () {
         $currentPlaylistVideos = $this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey);
         foreach ($currentPlaylistVideos as $v) {
-            $this->deleteTag($v["key"], $v["tags"]);
+            // reconstruct clean tags
+            $tags = explode(", ",  $v["tags"]);
+            unset($tags[array_search($this->playlistSettings->playlistTag, $tags)]);
+            $newTag = trim(implode(", ", $tags));
+
+            $this->jwpWrapper->videos->setTags($v["key"], $newTag);
         }
-
-    }
-
-    private function addTagToVideo ($video, $oldTag) {
-        if (strpos($this->playlistSettings->playlistTag, $oldTag)) {
-            return ;
-        }
-
-        $newTag = $oldTag . ', ' . $this->playlistSettings->playlistTag;
-        $this->jwpWrapper->videos->setTags($video, $newTag);
-    }
-
-    private function deleteTag ($video, $oldTag) {
-        // reconstruct clean tags
-        $tags = explode(", ", $oldTag);
-        unset($tags[array_search($this->playlistSettings->playlistTag, $tags)]);
-        $newTag = trim(implode(", ", $tags));
-
-        $this->jwpWrapper->videos->setTags($video, $newTag);
     }
 
     private function selectVideos() {
@@ -112,7 +95,12 @@ class PlaylistRefresherByTags
         $videoSelection = $this->selectVideos();
 
         foreach ($videoSelection as $v) {
-            $this->addTagToVideo($v["key"], $v["tags"]);
+            if (strpos($this->playlistSettings->playlistTag, $v["tags"])) {
+                return ;
+            }
+
+            $newTag = $v["tags"] . ', ' . $this->playlistSettings->playlistTag;
+            $this->jwpWrapper->videos->setTags($v["key"], $newTag);
         }
     }
 
@@ -143,7 +131,8 @@ class PlaylistRefresherByTags
             "settings" => $this->playlistSettings->getSettings(),
             "resulting_playlist" => $playlist,
         ];
-        $this->logger->logs = array_merge($this->logger->logs, $endScriptLog);
+
+        $this->logger->logs = array_merge($endScriptLog, $this->logger->logs);
         $this->logger->printLogInFile();
         
         $this->logger->displayLogInConsole();

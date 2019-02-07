@@ -7,5 +7,3 @@ require_once('credentials.php');
 $algo = new PlaylistRefresherByTags();
 $algo->refreshPlaylist();
 
-
-
