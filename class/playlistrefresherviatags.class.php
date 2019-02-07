@@ -1,7 +1,7 @@
 <?php
 
-require_once "class/logger.class.php";
-require_once "jw-platform-wrapper/jwpwrapper.class.php";
+require_once "logger.class.php";
+require_once("jw-platform-wrapper/jwpwrapper.class.php");
 
 // Refresh a JW playlist with the settings provided in settings.php
 class PlaylistRefresherByTags

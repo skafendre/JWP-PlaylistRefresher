@@ -1,6 +1,6 @@
 <?php
 
-require_once('playlistrefresherviatags.php');
+require_once('class/playlistrefresherviatags.class.php');
 require_once('settings.php');
 require_once('credentials.php');
 
