@@ -2,8 +2,9 @@
 
 class PlaylistSettings {
 
-    function __construct()
+    function __construct($config)
     {
+        $this->settingsConfig = $config;
         $this->useJSONSettings();
     }
 
@@ -17,7 +18,7 @@ class PlaylistSettings {
     function useJSONSettings () {
         $json = json_decode(file_get_contents("settings.json"), true);
 
-        if (!isset($this->settingsConfig)) {
+        if (is_null($this->settingsConfig)) {
             // choose settings to use with -s in console
             global $argv;
 

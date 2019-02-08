@@ -18,11 +18,12 @@ class PlaylistRefresherByTags
         $this->channelExist = $channelExist;
     }
 
-    function __construct()
+    function __construct($config = null)
     {
         $this->jwpWrapper = new JWPWrapper();
         $this->logger = new Logger();
-        $this->playlistSettings = new PlaylistSettings();
+        $this->playlistSettings = new PlaylistSettings($config);
+        $this->playlistSettings->useJSONSettings();
 
         if ($test = $this->playlistSettings->getInvalidsSettings()["areValid"] === 0) {
 
@@ -31,8 +32,6 @@ class PlaylistRefresherByTags
 
         $this->verifyCredentials();
     }
-
-    // --> Methods -->
 
     public function refreshPlaylist () {
         // log settings and playlist state before any changes are made
