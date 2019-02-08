@@ -15,7 +15,7 @@ class Logger {
     }
 
      function formatLogs () {
-        $formatedLogs = $this->logs["date"] . ", " . $this->logs["timestamp"] . " \n";
+        $formatedLogs = "";
         foreach ($this->logs as $key => $value) {
             if (is_array($value)) {
                 $formatedLogs .= trim($key). "=> array : \n";

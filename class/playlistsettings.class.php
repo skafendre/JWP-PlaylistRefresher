@@ -25,7 +25,7 @@ class PlaylistSettings {
             // if there is no -s argument
             $index = array_search("-s", $argv);
             if (!$index) {
-                echo "ERROR! Please specify the settings you want to use preceded by '-s'in console, or by setting the settingsConfig proprety in the PlaylistSettings class \n Possible settingsConfigs in settings.json : ";
+                echo "ERROR! Please specify the settings you want to use preceded by '-s'in console, or by setting passing a parameter at the instanciation of the  PlaylistRefresherViaTags class";
                 foreach ($json as $key => $value) {
                     echo $key . " | ";
                 }

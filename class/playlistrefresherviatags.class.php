@@ -5,6 +5,7 @@ require_once "playlistsettings.class.php";
 require_once("jw-platform-wrapper/jwpwrapper.class.php");
 
 // Refresh a JW playlist with the settings provided in settings.php
+
 class PlaylistRefresherByTags
 {
     private $logger;
@@ -46,7 +47,6 @@ class PlaylistRefresherByTags
         $response = $this->jwpWrapper->channels->fetchChannelVideos($this->playlistSettings->channelKey, true);
         // if the dummy return an error, end script
         if ($response["status"] === "error" ) {
-            $this->logger->consoleLog($response, __FUNCTION__);
             // special case when the error concerns the channel_key
             if (strpos($response["message"], "channel_key")){
                 $this->setChannelExist(false);
