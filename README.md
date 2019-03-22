@@ -1,6 +1,6 @@
 # refresh-jwplayer-playlist
 
-A PHP class that refresh our jwplayer playlists via the JWPlatform API.
+A PHP class that refresh jwplayer playlists via the JWPlatform API.
 doc : https://developer.jwplayer.com/jw-platform/reference/v1/
 
 Standalone API calls, doesn't interact with frond-end or DB.
