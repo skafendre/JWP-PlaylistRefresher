@@ -1,7 +1,7 @@
 {
   "prod" : {
-    "playlist_tag" : "playlist Konbini",
-    "channel_key" : "GOHRhAkf",
+    "playlist_tag" : "prod",
+    "channel_key" : "FHJS45Ls",
     "days_interval" : "7",
     "videos_number" : "10"
   },
